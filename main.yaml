@@ -1,0 +1,6 @@
+---
+- name: Top level play for the entire installation
+  hosts: all
+  user: centos
+
+- import_playbook: playbooks/filebeats.yaml

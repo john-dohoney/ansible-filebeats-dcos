@@ -1,0 +1,63 @@
+---
+- hosts: dcos-cluster 
+  remote_user: azureuser
+  become: true
+
+  tasks:
+  - name: install the latest version of wget
+    package:
+      name: wget
+      state: latest
+
+  - name: Download and install Filebeats
+    shell: |
+         curl -L -O https://artifacts.elastic.co/downloads/beats/filebeat/filebeat-5.0.0-x86_64.rpm
+         rpm -vi filebeat-5.0.0-x86_64.rpm
+
+  - name: Create /var/log/dcos directory
+    file:
+       dest: /var/log/dcos
+       state: directory
+       mode: 0755
+
+  - name: Move the default Filebeat configuration file to a backup copy 
+    shell: |
+         mv /etc/filebeat/filebeat.yml /etc/filebeat/filebeat.yml.BAK
+         
+  - name: Populate a new filebeat.yml
+    template:
+      src: ../files/filebeat.yml.j2
+      dest: /etc/filebeat/filebeat.yml
+
+  - name: Remove /etc/systemd/system/dcos-journalctl-filebeat.service
+    shell: |
+         rm -rf /etc/systemd/system/dcos-journalctl-filebeat.service
+
+  - name: Configure Filebeats
+    blockinfile:
+      dest: /etc/systemd/system/dcos-journalctl-filebeat.service
+      state: present
+      create: yes
+      block: |
+        [Unit]
+        Description=DCOS journalctl parser to filebeat
+        Wants=filebeat.service
+        After=filebeat.service
+
+        [Service]
+        Restart=always
+        RestartSec=5
+        ExecStart=/bin/sh -c '/usr/bin/journalctl --since="5 minutes ago" --no-tail --follow --unit="dcos*.service" >> /var/log/dcos/dcos.log 2>&1'
+
+        [Install]
+        WantedBy=multi-user.target
+
+  - name: Reload and start the new Filebeats Service 
+    shell: |
+       systemctl daemon-reload
+       systemctl start dcos-journalctl-filebeat.service
+       systemctl enable dcos-journalctl-filebeat.service
+       systemctl start filebeat
+       systemctl enable filebeat
+
+

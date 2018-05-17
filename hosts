@@ -1,0 +1,12 @@
+[bootstrap]
+34.219.68.174
+[masters]
+34.219.81.93
+[public-agents]
+34.209.244.59
+[private-agents]
+34.218.222.218
+[dcos-cluster:children]
+masters
+public-agents
+private-agents
